@@ -175,7 +175,6 @@ def print_differences(module_differences, puppetfile_modules):
             has_errors = True
     return has_errors
 
-if __name__ == '__main__':
     result = subprocess.run(['git', 'diff', '--name-only', '--cached', 'Puppetfile'], capture_output=True, text=True)
     changed_files = result.stdout.splitlines()
 
@@ -196,3 +195,6 @@ if __name__ == '__main__':
     else:
         print("No changes to Puppetfile, skipping dependency check.")
         sys.exit(0)
+
+if __name__ == '__main__':
+    main()
