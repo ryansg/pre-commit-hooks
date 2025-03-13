@@ -9,9 +9,4 @@ setup(
         'semver',
         'requests',
     ],
-    entry_points={
-        'console_scripts': [
-            'check-puppetfile-dependencies = pre_commit_hooks.check_puppetfile_dependencies:main',  # Corrected entry point
-        ],
-    },
 )
