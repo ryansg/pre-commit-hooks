@@ -48,6 +48,7 @@ def fetch_module_data(module_info):
 def main():
     parser = argparse.ArgumentParser(description="Check Puppetfile dependencies against Puppet Forge.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
+    parser.add_argument("-a", "--print-all", action="store_true", help="Print all modules and dependencies.")
     args = parser.parse_args()
 
     def parse_r10k_puppetfile(puppetfile_path):
@@ -132,7 +133,7 @@ def main():
                 return False  # Add a return value here
         return True
 
-    def print_differences(module_differences, puppetfile_modules, verbose=False):
+    def print_differences(module_differences, puppetfile_modules, verbose=False, print_all=False):
         """Prints module differences with color-coded status."""
         has_errors = False
         for module, diff in module_differences.items():
@@ -172,11 +173,11 @@ def main():
                     else:
                         dependency_lines.append(f"    - {dep_name} ({dep_version})")
 
-            if module_has_errors or outdated_version:
+            if module_has_errors or outdated_version or print_all: #Changed to or print_all
                 print(f"\033[1mModule: {module}\033[0m") # Make Module bold
                 print(f"  Puppetfile Tag: {puppet_tag}")
                 print(f"  Forge Version: {forge_version} {orange_outdated}")
-                if dependency_lines: #Only print if there is data.
+                if dependency_lines or print_all: #Changed to or print_all
                     print("  Forge Dependencies:")
                     for line in dependency_lines:
                         print(line)
@@ -190,15 +191,15 @@ def main():
     result = subprocess.run(['git', 'diff', '--name-only', 'HEAD', 'Puppetfile'], capture_output=True, text=True)
     changed_files = result.stdout.splitlines()
 
-    if 'Puppetfile' in changed_files:
+    if 'Puppetfile' in changed_files or args.print_all: 
         puppetfile_path = 'Puppetfile'
         puppetfile_modules = parse_r10k_puppetfile(puppetfile_path)
         forge_modules = get_current_release_and_metadata(puppetfile_modules)
         module_differences = compare_modules(puppetfile_modules, forge_modules)
 
-        has_errors = print_differences(module_differences, puppetfile_modules)
+        has_errors = print_differences(module_differences, puppetfile_modules, args.verbose, args.print_all)
 
-        if has_errors:
+        if has_errors and not args.print_all: #Added and not args.print_all 
             print("Puppetfile has dependency errors. Please correct them.")
             sys.exit(1)
         else:
