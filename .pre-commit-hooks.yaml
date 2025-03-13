@@ -1,6 +1,6 @@
 -   id: check-puppetfile-dependencies
     name: Check Puppetfile Dependencies
     description: Checks Puppetfile dependencies against Puppet Forge.
-    entry: pre_commit_hooks/check_puppetfile_dependencies.py
+    entry: pre_commit_hooks/check-puppetfile-dependencies.py
     language: script
     files: ^Puppetfile$
