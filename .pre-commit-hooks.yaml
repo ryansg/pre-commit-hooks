@@ -1,7 +1,6 @@
-- id: check-puppetfile-dependencies 
-  name: Check puppetforge modules 
-  description: Ensure forge modules have appropriate dependencies 
-  entry: pre_commit_hooks/check-puppetfile-dependencies.py
-  language: python
-  types: [text]
-  args: [--verbose]
+-   id: check-puppetfile-dependencies
+    name: Check Puppetfile Dependencies
+    description: Checks Puppetfile dependencies against Puppet Forge.
+    entry: pre_commit_hooks/check_puppetfile_dependencies.py
+    language: script
+    files: ^Puppetfile$
