@@ -46,6 +46,10 @@ def fetch_module_data(module_info):
         return module_name, None
 
 def main():
+    parser = argparse.ArgumentParser(description="Check Puppetfile dependencies against Puppet Forge.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
+    args = parser.parse_args()
+
     def parse_r10k_puppetfile(puppetfile_path):
         """Parses Puppetfile and extracts module, git URL, and tag."""
         module_data = {}
@@ -128,7 +132,7 @@ def main():
                 return False  # Add a return value here
         return True
 
-    def print_differences(module_differences, puppetfile_modules):
+    def print_differences(module_differences, puppetfile_modules, verbose=False):
         """Prints module differences with color-coded status."""
         has_errors = False
         for module, diff in module_differences.items():
@@ -140,7 +144,7 @@ def main():
             forge_deps = diff['forge_dependencies']
             puppet_deps = {k: v['tag'] for k, v in puppetfile_modules.items()}
 
-            has_not_found_or_invalid = False  # Track only Not Found or Invalid errors
+            module_has_errors = False  # Track errors for the current module
             dependency_lines = []
 
             for dep in forge_deps:
@@ -151,27 +155,35 @@ def main():
                     not_found = "[Not Found]"
                     red_not_found = f"\033[31m{not_found}\033[0m"
                     dependency_lines.append(f"    - {dep_name} ({dep_version}) {red_not_found} {orange_outdated if puppet_tag != forge_version else ''}")
-                    has_not_found_or_invalid = True
+                    module_has_errors = True
                     has_errors = True
+                    if verbose:
+                        print(f"Debug: Not Found - {dep_name}") # debug output
                 else:
                     puppet_dep_version = puppet_deps.get(dep_name)
                     if not compare_versions(puppet_dep_version, dep_version):
                         invalid_version = f"[Invalid - Provided:{puppet_dep_version}]"
                         orange_invalid = f"\033[38;5;208m{invalid_version}\033[0m"
                         dependency_lines.append(f"    - {dep_name} ({dep_version}) {orange_invalid}")
-                        has_not_found_or_invalid = True
+                        module_has_errors = True
                         has_errors = True
+                        if verbose:
+                            print(f"Debug: Invalid - {dep_name}") # debug output
                     else:
                         dependency_lines.append(f"    - {dep_name} ({dep_version})")
 
-            if has_not_found_or_invalid or outdated_version:
-                print(f"Module: {module}")
+            if module_has_errors or outdated_version:
+                print(f"\033[1mModule: {module}\033[0m") # Make Module bold
                 print(f"  Puppetfile Tag: {puppet_tag}")
                 print(f"  Forge Version: {forge_version} {orange_outdated}")
-                print("  Forge Dependencies:")
-                for line in dependency_lines:
-                    print(line)
+                if dependency_lines: #Only print if there is data.
+                    print("  Forge Dependencies:")
+                    for line in dependency_lines:
+                        print(line)
                 print("-" * 20)
+                if verbose:
+                    print(f"Debug: module_has_errors: {module_has_errors}, outdated_version: {outdated_version}") # Debug output
+                    print(f"Debug: has_errors: {has_errors}") #debug output
 
         return has_errors  # Return True if Not Found or Invalid errors were found
 
