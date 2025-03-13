@@ -124,8 +124,8 @@ def main():
                     elif operator == '=':
                         if not semver.compare(puppet_dep_version, version) == 0:
                             return False
-        except ValueError:
-            return False
+            except ValueError:
+                return False  # Add a return value here
         return True
 
     def print_differences(module_differences, puppetfile_modules):
