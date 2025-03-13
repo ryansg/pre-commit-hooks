@@ -108,29 +108,35 @@ def main():
         requirements = re.findall(r'([<>=]+)\s*([\d.]+)', dep_version_requirement)
         if not requirements:
             try:
-                return semver.match(puppet_dep_version, dep_version_requirement)
+                result = semver.match(puppet_dep_version, dep_version_requirement)
+                return result
             except ValueError:
                 return False
 
         for operator, version in requirements:
             try:
                 if operator == '>=':
-                    if not semver.compare(puppet_dep_version, version) >= 0:
+                    result = semver.compare(puppet_dep_version, version) >= 0
+                    if not result:
                         return False
-                    elif operator == '>':
-                        if not semver.compare(puppet_dep_version, version) > 0:
-                            return False
-                    elif operator == '<=':
-                        if not semver.compare(puppet_dep_version, version) <= 0:
-                            return False
-                    elif operator == '<':
-                        if not semver.compare(puppet_dep_version, version) < 0:
-                            return False
-                    elif operator == '=':
-                        if not semver.compare(puppet_dep_version, version) == 0:
-                            return False
+                elif operator == '>':
+                    result = semver.compare(puppet_dep_version, version) > 0
+                    if not result:
+                        return False
+                elif operator == '<=':
+                    result = semver.compare(puppet_dep_version, version) <= 0
+                    if not result:
+                        return False
+                elif operator == '<':
+                    result = semver.compare(puppet_dep_version, version) < 0
+                    if not result:
+                        return False
+                elif operator == '=':
+                    result = semver.compare(puppet_dep_version, version) == 0
+                    if not result:
+                        return False
             except ValueError:
-                return False  # Add a return value here
+                return False
         return True
 
     def print_differences(module_differences, puppetfile_modules, verbose=False, print_all=False):
