@@ -176,7 +176,7 @@ def main():
 
         return has_errors  # Return True if Not Found or Invalid errors were found
 
-        result = subprocess.run(['git', 'diff', '--name-only', '--cached', 'Puppetfile'], capture_output=True, text=True)
+        result = subprocess.run(['git', 'diff', '--name-only', 'HEAD', 'Puppetfile'], capture_output=True, text=True)
         changed_files = result.stdout.splitlines()
 
         if 'Puppetfile' in changed_files:
