@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import re
 import requests
 import argparse
@@ -8,6 +7,43 @@ import multiprocessing
 import subprocess
 import sys
 import os
+
+def get_forge_data(module_name):
+    """Queries the Puppet Forge API for module data, renaming 'puppet-resource_tree'."""
+    try:
+        if module_name == 'puppet-resource_tree':
+            module_name = 'jake-resource_tree'
+        api_url = f"https://forgeapi.puppet.com/v3/modules/{module_name}"
+        response = requests.get(api_url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data for {module_name}: {e}")
+        return None
+
+def fetch_module_data(module_info):
+    """Fetches module data from the Forge API."""
+    module_name, data = module_info
+    if not data['git_url'].startswith("https://github.com/"):
+        return module_name, None  # Skip if not GitHub URL
+    forge_data = get_forge_data(module_name)
+    if forge_data:
+        current_release = forge_data.get('current_release')
+        if current_release:
+            current_version = current_release.get('version')
+            metadata = current_release.get('metadata', {})
+            dependencies = metadata.get('dependencies', [])
+            return module_name, {
+                'tag': data['tag'],
+                'current_version': current_version,
+                'dependencies': dependencies
+            }
+        else:
+            print(f"No current release found for {module_name}")
+            return module_name, None
+    else:
+        print(f"Skipping {module_name} due to fetch error.")
+        return module_name, None
 
 def main():
     def parse_r10k_puppetfile(puppetfile_path):
@@ -28,43 +64,6 @@ def main():
         except Exception as e:
             print(f"An error occurred: {e}")
         return module_data
-
-    def get_forge_data(module_name):
-        """Queries the Puppet Forge API for module data, renaming 'puppet-resource_tree'."""
-        try:
-            if module_name == 'puppet-resource_tree':
-                module_name = 'jake-resource_tree'
-            api_url = f"https://forgeapi.puppet.com/v3/modules/{module_name}"
-            response = requests.get(api_url)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching data for {module_name}: {e}")
-            return None
-
-    def fetch_module_data(module_info):
-        """Fetches module data from the Forge API."""
-        module_name, data = module_info
-        if not data['git_url'].startswith("https://github.com/"):
-            return module_name, None  # Skip if not GitHub URL
-        forge_data = get_forge_data(module_name)
-        if forge_data:
-            current_release = forge_data.get('current_release')
-            if current_release:
-                current_version = current_release.get('version')
-                metadata = current_release.get('metadata', {})
-                dependencies = metadata.get('dependencies', [])
-                return module_name, {
-                    'tag': data['tag'],
-                    'current_version': current_version,
-                    'dependencies': dependencies
-                }
-            else:
-                print(f"No current release found for {module_name}")
-                return module_name, None
-        else:
-            print(f"Skipping {module_name} due to fetch error.")
-            return module_name, None
 
     def get_current_release_and_metadata(module_data):
         """Gets current release version and metadata from Forge data using multiprocessing."""
@@ -113,20 +112,20 @@ def main():
                 if operator == '>=':
                     if not semver.compare(puppet_dep_version, version) >= 0:
                         return False
-                elif operator == '>':
-                    if not semver.compare(puppet_dep_version, version) > 0:
-                        return False
-                elif operator == '<=':
-                    if not semver.compare(puppet_dep_version, version) <= 0:
-                        return False
-                elif operator == '<':
-                    if not semver.compare(puppet_dep_version, version) < 0:
-                        return False
-                elif operator == '=':
-                    if not semver.compare(puppet_dep_version, version) == 0:
-                        return False
-            except ValueError:
-                return False
+                    elif operator == '>':
+                        if not semver.compare(puppet_dep_version, version) > 0:
+                            return False
+                    elif operator == '<=':
+                        if not semver.compare(puppet_dep_version, version) <= 0:
+                            return False
+                    elif operator == '<':
+                        if not semver.compare(puppet_dep_version, version) < 0:
+                            return False
+                    elif operator == '=':
+                        if not semver.compare(puppet_dep_version, version) == 0:
+                            return False
+        except ValueError:
+            return False
         return True
 
     def print_differences(module_differences, puppetfile_modules):
