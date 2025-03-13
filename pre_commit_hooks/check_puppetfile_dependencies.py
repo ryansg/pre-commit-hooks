@@ -175,26 +175,26 @@ def main():
 
         return has_errors  # Return True if Not Found or Invalid errors were found
 
-        result = subprocess.run(['git', 'diff', '--name-only', 'HEAD', 'Puppetfile'], capture_output=True, text=True)
-        changed_files = result.stdout.splitlines()
+    result = subprocess.run(['git', 'diff', '--name-only', 'HEAD', 'Puppetfile'], capture_output=True, text=True)
+    changed_files = result.stdout.splitlines()
 
-        if 'Puppetfile' in changed_files:
-            puppetfile_path = 'Puppetfile'
-            puppetfile_modules = parse_r10k_puppetfile(puppetfile_path)
-            forge_modules = get_current_release_and_metadata(puppetfile_modules)
-            module_differences = compare_modules(puppetfile_modules, forge_modules)
+    if 'Puppetfile' in changed_files:
+        puppetfile_path = 'Puppetfile'
+        puppetfile_modules = parse_r10k_puppetfile(puppetfile_path)
+        forge_modules = get_current_release_and_metadata(puppetfile_modules)
+        module_differences = compare_modules(puppetfile_modules, forge_modules)
 
-            has_errors = print_differences(module_differences, puppetfile_modules)
+        has_errors = print_differences(module_differences, puppetfile_modules)
 
-            if has_errors:
-                print("Puppetfile has dependency errors. Please correct them.")
-                sys.exit(1)
-            else:
-                print("Puppetfile dependencies are valid.")
-                sys.exit(0)
+        if has_errors:
+            print("Puppetfile has dependency errors. Please correct them.")
+            sys.exit(1)
         else:
-            print("No changes to Puppetfile, skipping dependency check.")
+            print("Puppetfile dependencies are valid.")
             sys.exit(0)
+    else:
+        print("No changes to Puppetfile, skipping dependency check.")
+        sys.exit(0)
 
 if __name__ == '__main__':
     main()
