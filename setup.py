@@ -1,17 +1,18 @@
+# setup.py
 from setuptools import setup, find_packages
 
 setup(
     name='puppetfile-dependency-check',
     version='1.0.0',
     description='Checks Puppetfile dependencies against Puppet Forge.',
-    py_modules=['check_puppetfile_dependencies'],  # List your Python modules
+    packages=find_packages(), # will find all packages inside of the root.
     install_requires=[
         'semver',
         'requests',
     ],
     entry_points={
         'console_scripts': [
-            'check_puppetfile_dependencies=check_puppetfile_dependencies:main', #Optional, if you want to run from the command line
+            'check-puppetfile-dependencies=pre_commit_hooks.check-puppetfile-dependencies:main', #Optional, if you want to run from the command line
         ],
     },
 )
