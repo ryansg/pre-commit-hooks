@@ -1,6 +1,7 @@
 -   id: check-puppetfile-dependencies
     name: Check Puppetfile Dependencies
     description: Checks Puppetfile dependencies against Puppet Forge.
+    entry: check-puppetfile-dependencies
     language: python
     language_version: python3
     files: ^Puppetfile$
