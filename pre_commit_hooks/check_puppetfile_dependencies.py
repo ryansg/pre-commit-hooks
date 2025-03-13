@@ -141,7 +141,7 @@ def main():
             forge_deps = diff['forge_dependencies']
             puppet_deps = {k: v['tag'] for k, v in puppetfile_modules.items()}
 
-            has_outdated_or_not_found = False
+            has_not_found_or_invalid = False  # Track only Not Found or Invalid errors
             dependency_lines = []
 
             for dep in forge_deps:
@@ -152,20 +152,20 @@ def main():
                     not_found = "[Not Found]"
                     red_not_found = f"\033[31m{not_found}\033[0m"
                     dependency_lines.append(f"    - {dep_name} ({dep_version}) {red_not_found} {orange_outdated if puppet_tag != forge_version else ''}")
-                    has_outdated_or_not_found = True
-                    has_errors=True
+                    has_not_found_or_invalid = True
+                    has_errors = True
                 else:
                     puppet_dep_version = puppet_deps.get(dep_name)
                     if not compare_versions(puppet_dep_version, dep_version):
                         invalid_version = f"[Invalid - Provided:{puppet_dep_version}]"
                         orange_invalid = f"\033[38;5;208m{invalid_version}\033[0m"
                         dependency_lines.append(f"    - {dep_name} ({dep_version}) {orange_invalid}")
-                        has_outdated_or_not_found = True
-                        has_errors=True
+                        has_not_found_or_invalid = True
+                        has_errors = True
                     else:
                         dependency_lines.append(f"    - {dep_name} ({dep_version})")
 
-            if has_outdated_or_not_found or outdated_version :
+            if has_not_found_or_invalid or outdated_version:
                 print(f"Module: {module}")
                 print(f"  Puppetfile Tag: {puppet_tag}")
                 print(f"  Forge Version: {forge_version} {orange_outdated}")
@@ -173,29 +173,8 @@ def main():
                 for line in dependency_lines:
                     print(line)
                 print("-" * 20)
-                has_errors = True
-        return has_errors
 
-        result = subprocess.run(['git', 'diff', '--name-only', '--cached', 'Puppetfile'], capture_output=True, text=True)
-        changed_files = result.stdout.splitlines()
-
-        if 'Puppetfile' in changed_files:
-            puppetfile_path = 'Puppetfile'
-            puppetfile_modules = parse_r10k_puppetfile(puppetfile_path)
-            forge_modules = get_current_release_and_metadata(puppetfile_modules)
-            module_differences = compare_modules(puppetfile_modules, forge_modules)
-
-            has_errors = print_differences(module_differences, puppetfile_modules)
-
-            if has_errors:
-                print("Puppetfile has dependency errors. Please correct them.")
-                sys.exit(1)
-            else:
-                print("Puppetfile dependencies are valid.")
-                sys.exit(0)
-        else:
-            print("No changes to Puppetfile, skipping dependency check.")
-            sys.exit(0)
+        return has_errors  # Return True if Not Found or Invalid errors were found
 
 if __name__ == '__main__':
     main()
