@@ -61,7 +61,7 @@ def main():
     parser = argparse.ArgumentParser(description="Check Puppetfile dependencies against Puppet Forge.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
     parser.add_argument("-a", "--print-all", action="store_true", help="Print all modules and dependencies.")
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()  # No need for parse_known_args here
 
     def parse_r10k_puppetfile(puppetfile_path):
         """Parses Puppetfile and extracts module, git URL, and tag."""
