@@ -50,6 +50,7 @@ def main():
     def parse_r10k_puppetfile(puppetfile_path):
         """Parses Puppetfile and extracts module, git URL, and tag."""
         module_data = {}
+        invalid_tags = []
         try:
             with open(puppetfile_path, 'r') as f:
                 for line in f:
@@ -63,11 +64,16 @@ def main():
                             semver.VersionInfo.parse(tag)
                             module_data[module_name] = {'tag': tag, 'git_url': git_url}
                         except ValueError:
-                            print(f"Skipping {module_name} due to invalid tag: {tag}")
+                            invalid_tags.append((module_name, tag))
         except FileNotFoundError:
             print(f"Error: Puppetfile not found at {puppetfile_path}")
         except Exception as e:
             print(f"An error occurred: {e}")
+
+        if invalid_tags:
+            print("The following modules have invalid semver tags and were skipped:")
+            for module, tag in invalid_tags:
+                print(f"  - {module}: {tag}")
         return module_data
 
     def get_current_release_and_metadata(module_data):
