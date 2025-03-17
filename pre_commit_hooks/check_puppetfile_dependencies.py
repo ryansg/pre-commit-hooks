@@ -8,39 +8,35 @@ import subprocess
 import sys
 import os
 
-def get_forge_data(module_name):
-    """Queries the Puppet Forge API for module data, renaming 'puppet-resource_tree'."""
+def get_forge_data(release_slug):
+    """Queries the Puppet Forge API for release data using release slug."""
     try:
-        if module_name == 'puppet-resource_tree':
-            module_name = 'jake-resource_tree'
-        api_url = f"https://forgeapi.puppet.com/v3/modules/{module_name}"
+        api_url = f"https://forgeapi.puppet.com/v3/releases/{release_slug}"
         response = requests.get(api_url)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching data for {module_name}: {e}")
+        print(f"Error fetching data for {release_slug}: {e}")
         return None
 
 def fetch_module_data(module_info):
-    """Fetches module data from the Forge API."""
+    """Fetches module data from the Forge API using release slug."""
     module_name, data = module_info
     if not data['git_url'].startswith("https://github.com/"):
         return module_name, None  # Skip if not GitHub URL
-    forge_data = get_forge_data(module_name)
+    release_slug = f"{module_name}-{data['tag']}"
+    if module_name == 'puppet-resource_tree':
+        release_slug = f"jake-resource_tree-{data['tag']}"
+    forge_data = get_forge_data(release_slug)
     if forge_data:
-        current_release = forge_data.get('current_release')
-        if current_release:
-            current_version = current_release.get('version')
-            metadata = current_release.get('metadata', {})
-            dependencies = metadata.get('dependencies', [])
-            return module_name, {
-                'tag': data['tag'],
-                'current_version': current_version,
-                'dependencies': dependencies
-            }
-        else:
-            print(f"No current release found for {module_name}")
-            return module_name, None
+        current_version = forge_data.get('version')
+        metadata = forge_data.get('metadata', {})
+        dependencies = metadata.get('dependencies', [])
+        return module_name, {
+            'tag': data['tag'],
+            'current_version': current_version,
+            'dependencies': dependencies
+        }
     else:
         print(f"Skipping {module_name} due to fetch error.")
         return module_name, None
@@ -63,7 +59,11 @@ def main():
                         module_name = match.group(1)
                         git_url = match.group(2)
                         tag = re.sub(r'^v', '', match.group(3), flags=re.IGNORECASE)
-                        module_data[module_name] = {'tag': tag, 'git_url': git_url}
+                        try:
+                            semver.VersionInfo.parse(tag)
+                            module_data[module_name] = {'tag': tag, 'git_url': git_url}
+                        except ValueError:
+                            print(f"Skipping {module_name} due to invalid tag: {tag}")
         except FileNotFoundError:
             print(f"Error: Puppetfile not found at {puppetfile_path}")
         except Exception as e:
