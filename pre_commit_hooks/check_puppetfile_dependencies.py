@@ -8,7 +8,7 @@ import subprocess
 import sys
 import os
 
-def get_forge_data(release_slug):
+def get_forge_release_data(release_slug):
     """Queries the Puppet Forge API for release data using release slug."""
     try:
         api_url = f"https://forgeapi.puppet.com/v3/releases/{release_slug}"
@@ -19,23 +19,39 @@ def get_forge_data(release_slug):
         print(f"Error fetching data for {release_slug}: {e}")
         return None
 
+def get_forge_module_data(module_name):
+    """Queries the Puppet Forge API for module data."""
+    try:
+        if module_name == 'puppet-resource_tree':
+            module_name = 'jake-resource_tree'
+        api_url = f"https://forgeapi.puppet.com/v3/modules/{module_name}"
+        response = requests.get(api_url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data for {module_name}: {e}")
+        return None
+
 def fetch_module_data(module_info):
-    """Fetches module data from the Forge API using release slug."""
+    """Fetches module data from the Forge API using release slug and verifies against module endpoint."""
     module_name, data = module_info
     if not data['git_url'].startswith("https://github.com/"):
-        return module_name, None  # Skip if not GitHub URL
+        return module_name, None
     release_slug = f"{module_name}-{data['tag']}"
     if module_name == 'puppet-resource_tree':
         release_slug = f"jake-resource_tree-{data['tag']}"
-    forge_data = get_forge_data(release_slug)
-    if forge_data:
-        current_version = forge_data.get('version')
-        metadata = forge_data.get('metadata', {})
+    forge_release_data = get_forge_release_data(release_slug)
+    forge_module_data = get_forge_module_data(module_name)
+    if forge_release_data and forge_module_data:
+        current_version = forge_release_data.get('version')
+        metadata = forge_release_data.get('metadata', {})
         dependencies = metadata.get('dependencies', [])
+        module_endpoint_version = forge_module_data.get('current_release', {}).get('version')
         return module_name, {
             'tag': data['tag'],
             'current_version': current_version,
-            'dependencies': dependencies
+            'dependencies': dependencies,
+            'module_endpoint_version': module_endpoint_version
         }
     else:
         print(f"Skipping {module_name} due to fetch error.")
@@ -45,7 +61,7 @@ def main():
     parser = argparse.ArgumentParser(description="Check Puppetfile dependencies against Puppet Forge.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
     parser.add_argument("-a", "--print-all", action="store_true", help="Print all modules and dependencies.")
-    args, unknown = parser.parse_known_args() # change parser.parse_args() to parser.parse_known_args()
+    args, unknown = parser.parse_known_args()
 
     def parse_r10k_puppetfile(puppetfile_path):
         """Parses Puppetfile and extracts module, git URL, and tag."""
@@ -98,14 +114,16 @@ def main():
                 differences[module_name] = {
                     'puppet_tag': puppet_tag,
                     'forge_version': forge_version,
-                    'forge_dependencies': forge_info['dependencies']
+                    'forge_dependencies': forge_info['dependencies'],
+                    'module_endpoint_version': forge_info['module_endpoint_version']
                 }
             else:
                 forge_deps = {dep['name'].replace('/', '-'): dep['version_requirement'] for dep in forge_info['dependencies']}
                 differences[module_name] = {
                     'puppet_tag': puppet_tag,
                     'forge_version': forge_version,
-                    'forge_dependencies': forge_info['dependencies']
+                    'forge_dependencies': forge_info['dependencies'],
+                    'module_endpoint_version': forge_info['module_endpoint_version']
                 }
         return differences
 
@@ -150,14 +168,14 @@ def main():
         has_errors = False
         for module, diff in module_differences.items():
             puppet_tag = diff['puppet_tag']
-            forge_version = diff['forge_version']
+            forge_version = diff['module_endpoint_version'] #Change to use module_endpoint_version
             outdated_version = "[Outdated]" if puppet_tag != forge_version else ""
             orange_outdated = f"\033[38;5;208m{outdated_version}\033[0m" if outdated_version else ""
 
             forge_deps = diff['forge_dependencies']
             puppet_deps = {k: v['tag'] for k, v in puppetfile_modules.items()}
 
-            module_has_errors = False  # Track errors for the current module
+            module_has_errors = False
             dependency_lines = []
 
             for dep in forge_deps:
@@ -167,11 +185,11 @@ def main():
                 if dep_name not in puppet_deps:
                     not_found = "[Not Found]"
                     red_not_found = f"\033[31m{not_found}\033[0m"
-                    dependency_lines.append(f"    - {dep_name} ({dep_version}) {red_not_found} {orange_outdated if puppet_tag != forge_version else ''}")
+                    dependency_lines.append(f"    - {dep_name} ({dep_version}) {red_not_found} {orange_outdated if outdated_version else ''}")
                     module_has_errors = True
                     has_errors = True
                     if verbose:
-                        print(f"Debug: Not Found - {dep_name}") # debug output
+                        print(f"Debug: Not Found - {dep_name}")
                 else:
                     puppet_dep_version = puppet_deps.get(dep_name)
                     if not compare_versions(puppet_dep_version, dep_version):
@@ -181,29 +199,29 @@ def main():
                         module_has_errors = True
                         has_errors = True
                         if verbose:
-                            print(f"Debug: Invalid - {dep_name}") # debug output
+                            print(f"Debug: Invalid - {dep_name}")
                     else:
                         dependency_lines.append(f"    - {dep_name} ({dep_version})")
 
-            if module_has_errors or outdated_version or print_all: #Changed to or print_all
-                print(f"\033[1mModule: {module}\033[0m") # Make Module bold
-                print(f"  Puppetfile Tag: {puppet_tag}")
-                print(f"  Forge Version: {forge_version} {orange_outdated}")
-                if dependency_lines or print_all: #Changed to or print_all
-                    print("  Forge Dependencies:")
+            if module_has_errors or outdated_version or print_all:
+                print(f"\033[1mModule: {module}\033[0m")
+                print(f"    Puppetfile Tag: {puppet_tag}")
+                print(f"    Forge Version: {forge_version} {orange_outdated}")
+                if dependency_lines or print_all:
+                    print("    Forge Dependencies:")
                     for line in dependency_lines:
                         print(line)
                 print("-" * 20)
                 if verbose:
-                    print(f"Debug: module_has_errors: {module_has_errors}, outdated_version: {outdated_version}") # Debug output
-                    print(f"Debug: has_errors: {has_errors}") #debug output
+                    print(f"Debug: module_has_errors: {module_has_errors}, outdated_version: {outdated_version}")
+                    print(f"Debug: has_errors: {has_errors}")
 
-        return has_errors  # Return True if Not Found or Invalid errors were found
+        return has_errors
 
     result = subprocess.run(['git', 'diff', '--name-only', 'HEAD', 'Puppetfile'], capture_output=True, text=True)
     changed_files = result.stdout.splitlines()
 
-    if 'Puppetfile' in changed_files or args.print_all: 
+    if 'Puppetfile' in changed_files or args.print_all:
         puppetfile_path = 'Puppetfile'
         puppetfile_modules = parse_r10k_puppetfile(puppetfile_path)
         forge_modules = get_current_release_and_metadata(puppetfile_modules)
@@ -211,7 +229,7 @@ def main():
 
         has_errors = print_differences(module_differences, puppetfile_modules, args.verbose, args.print_all)
 
-        if has_errors and not args.print_all: #Added and not args.print_all 
+        if has_errors and not args.print_all:
             print("Puppetfile has dependency errors. Please correct them.")
             sys.exit(1)
         else:
